@@ -367,26 +367,6 @@
   }
 
   /* Payment method tabs */
-  .pay-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
-  .pay-tab{
-    padding:12px 8px;
-    border:1px solid rgba(212,165,72,.25);
-    border-radius:6px;
-    text-align:center;
-    cursor:pointer;
-    background:rgba(10,6,5,.4);
-    font-family:'Cinzel',serif;font-size:11px;letter-spacing:.2em;
-    color:var(--cream);
-    transition:all .15s;
-    text-transform:uppercase;
-  }
-  .pay-tab:hover{border-color:var(--gold)}
-  .pay-tab.active{
-    border-color:var(--gold);
-    background:linear-gradient(180deg, rgba(212,165,72,.18), rgba(164,22,42,.1));
-    color:var(--gold-bright);
-    box-shadow:inset 0 0 0 1px var(--gold);
-  }
   .pay-panel{display:none;padding:16px;background:rgba(10,6,5,.4);border-radius:6px;border:1px dashed rgba(212,165,72,.2)}
   .pay-panel.active{display:block}
   .pay-panel p{margin:0 0 10px;font-size:13px;color:var(--muted)}
@@ -887,21 +867,10 @@
       </div>
     </div>
 
-    <h2 style="margin-top:26px">Payment Method</h2>
-    <div class="pay-tabs">
-      <div class="pay-tab active" data-pay="paypal">PayPal</div>
-      <div class="pay-tab" data-pay="zelle">Zelle</div>
-    </div>
+    <h2 style="margin-top:26px">Zelle Payment</h2>
 
-    <div class="pay-panel active" data-pay-panel="paypal">
-      <p>Use PayPal to complete payment. Your unique ticket QR code will be generated for your order.</p>
-      <a class="payment-link" href="https://paypal.me/cabaretunited" target="_blank" rel="noopener">
-        Pay with PayPal →
-      </a>
-    </div>
-
-    <div class="pay-panel" data-pay-panel="zelle">
-      <p>Send the total amount below via Zelle. Include your name in the memo, then click "Confirm Zelle Payment" to receive your ticket.</p>
+    <div class="pay-panel active" data-pay-panel="zelle">
+      <p>Send the total amount below via Zelle. Include your name in the memo, then click "Confirm Zelle Payment". Your ticket and QR code will be generated immediately. The ticket will remain awaiting payment until Cabaret United confirms the Zelle payment.</p>
       <div class="zelle-info">
         <div style="flex:1">
           <span class="z-label">Send Zelle To</span>
@@ -909,7 +878,7 @@
         </div>
         <button type="button" class="copy-btn" onclick="copyZelle()">Copy Number</button>
       </div>
-      <p style="margin-top:12px;font-size:11px;color:var(--muted)">Use the Zelle feature in your bank app and send the payment to this phone number.</p>
+      <p style="margin-top:12px;font-size:11px;color:var(--muted)">Use the Zelle feature in your bank app and send the payment to this phone number before confirming your purchase.</p>
     </div>
 
     <div class="total">
@@ -920,7 +889,7 @@
       <span class="t-amt" id="total-amt">$200.00</span>
     </div>
 
-    <button type="button" class="submit-btn" onclick="submitPurchase()">Complete Purchase</button>
+    <button type="button" class="submit-btn" onclick="submitPurchase()">Confirm Zelle Payment</button>
     <div class="wallet-tools">
       <button type="button" id="wallet-launch" class="btn-secondary wallet-btn" onclick="viewTicketWallet()">View My Tickets</button>
       <div class="wallet-note">Your tickets are saved on this device in this browser. You can return here later to view them again.</div>
@@ -1181,17 +1150,6 @@
   document.querySelectorAll('input[name="ticket"]').forEach(r => r.addEventListener('change', recalc));
   document.getElementById('qty').addEventListener('input', recalc);
   promoEl.addEventListener('input', recalc);
-
-  // ————— Payment tabs —————
-  document.querySelectorAll('.pay-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.pay-tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.pay-panel').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      document.querySelector(`.pay-panel[data-pay-panel="${tab.dataset.pay}"]`).classList.add('active');
-    });
-  });
-
   // ————— Zelle copy —————
   function toast(msg){
     const t = document.getElementById('toast');
@@ -1399,7 +1357,6 @@
   function escapeHtml(v){
     return String(v).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   }
-
   // ————— Submit —————
   function submitPurchase(){
     const name = document.getElementById('attendee-name').value.trim();
@@ -1414,12 +1371,13 @@
     if(enteredPromo === EARLY_BIRD_CODE && !earlyBirdActive()){
       toast('Early Bird has expired'); recalc(); return;
     }
-    const method = document.querySelector('.pay-tab.active').dataset.pay;
-    const transactionId = makeTxnId();
+    const method = 'zelle';
     const unitPrice = promoApplied() ? EARLY_BIRD_PRICE : parseFloat(chosen.dataset.price || REGULAR_PRICE);
     const discountPerTicket = promoApplied() ? (REGULAR_PRICE - EARLY_BIRD_PRICE) : 0;
-    const total = '$' + (unitPrice * qty).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-
+    const amount = Number((unitPrice * qty).toFixed(2));
+    // Zelle registration flow.
+    const transactionId = makeTxnId();
+    const total = '$' + amount.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
     const base = {
       transactionId,
       attendeeName:name, email, phone,
@@ -1440,7 +1398,7 @@
     const statusEl = document.getElementById('sync-status');
     statusEl.classList.remove('hidden'); statusEl.textContent='Syncing…'; statusEl.className='sync-pill syncing';
     Promise.all(tickets.map(t => logToSheet(t))).then(results => {
-      if(results.every(r=>r.logged)) { statusEl.textContent='✓ Tickets registered'; statusEl.className='sync-pill ok'; }
+      if(results.every(r=>r.logged)) { statusEl.textContent='✓ Tickets created — payment awaiting confirmation'; statusEl.className='sync-pill ok'; }
       else if(results.every(r=>r.reason==='not-configured')) { statusEl.textContent='Check-in sheet not configured'; statusEl.className='sync-pill warn'; }
       else { statusEl.textContent='Some tickets could not be registered'; statusEl.className='sync-pill err'; }
     });
