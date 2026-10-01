@@ -1119,7 +1119,7 @@
   function recalc(){
     const chosen = document.querySelector('input[name="ticket"]:checked');
     const qty = Math.max(1, Math.min(20, parseInt(document.getElementById('qty').value || 1, 10)));
-    document.getElementById('qty').value = qty;
+    
     const basePrice = parseFloat(chosen.dataset.price || REGULAR_PRICE);
     const unitPrice = promoApplied() ? EARLY_BIRD_PRICE : basePrice;
     const total = (unitPrice * qty).toFixed(2);
